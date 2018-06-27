@@ -45,6 +45,7 @@ then
 fi
 
 #wget -V > /dev/null 2>&1;
+which scp > /dev/null 2>&1;
 if [ $? -ne 0 ];
 then
   echo "This script requires wget to be available on the system and reachable in a directory mentioned in the PATH variable."
