@@ -1,4 +1,5 @@
 #include "cvecheck.h"
+
 /*
  * Copyright 2010-2017 Sven Vermeulen.
  * Subject to the GNU Public License, version 3.

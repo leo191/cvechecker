@@ -4,6 +4,7 @@ if [ $# -ne 3 ];
 then
   echo "Usage: $0 pull";
   echo "       $0 cleancache";
+  echo "       $0 pull user@host password key"
   exit 1;
 fi
 
@@ -12,30 +13,30 @@ die() {
   exit 1;
 }
 
-# CONFFILE="";
-# if [ -n "${CVECHECKER_CONFFILE}" ];
-# then
-#   if [ -f "${CVECHECKER_CONFFILE}" ];
-#   then
-#     CONFFILE="${CVECHECKER_CONFFILE}";
-#   else
-#     die "File ${CVECHECKER_CONFILE} specified in CVECHECKER_CONFFILE environment variable does not exist.";
-#   fi
-# elif [ -f ~/.cvechecker.rc ];
-# then
-#   CONFFILE=~/.cvechecker.rc;
-# elif [ -f /usr/local/etc/cvechecker.conf ];
-# then
-#   CONFFILE=/usr/local/etc/cvechecker.conf;
-# elif [ -f /etc/cvechecker.conf ];
-# then
-#   CONFFILE=/etc/cvechecker.conf;
-# fi
+CONFFILE="";
+if [ -n "${CVECHECKER_CONFFILE}" ];
+then
+  if [ -f "${CVECHECKER_CONFFILE}" ];
+  then
+    CONFFILE="${CVECHECKER_CONFFILE}";
+  else
+    die "File ${CVECHECKER_CONFILE} specified in CVECHECKER_CONFFILE environment variable does not exist.";
+  fi
+elif [ -f ~/.cvechecker.rc ];
+then
+  CONFFILE=~/.cvechecker.rc;
+elif [ -f /usr/local/etc/cvechecker.conf ];
+then
+  CONFFILE=/usr/local/etc/cvechecker.conf;
+elif [ -f /etc/cvechecker.conf ];
+then
+  CONFFILE=/etc/cvechecker.conf;
+fi
 
-# if [ ! -f "${CONFFILE}" ];
-# then
-#   die "Configuration file ${CONFFILE} does not exist.";
-# fi
+if [ ! -f "${CONFFILE}" ];
+then
+  die "Configuration file ${CONFFILE} does not exist.";
+fi
 
 xsltproc -V > /dev/null 2>&1;
 if [ $? -ne 0 ];
@@ -60,38 +61,38 @@ then
 fi
 
 
-# DATADIR=$(awk -F'=' '/^datadir/ {print $2}' ${CONFFILE} | awk -F'"' '{print $2}');
-# CVECACHE=$(awk -F'=' '/^cvecache/ {print $2}' ${CONFFILE} | awk -F'"' '{print $2}');
-# DLLOCATION=$(awk -F'=' '/^version_url/ {print $2}' ${CONFFILE} | awk -F'"' '{print $2}');
-#WGETCMD="wget --no-check-certificate";
-#REMOTE_DATA_DIR=$2
-SCPCMD="sshpass -p $3 scp "
+DATADIR=$(awk -F'=' '/^datadir/ {print $2}' ${CONFFILE} | awk -F'"' '{print $2}');
+CVECACHE=$(awk -F'=' '/^cvecache/ {print $2}' ${CONFFILE} | awk -F'"' '{print $2}');
+DLLOCATION=$(awk -F'=' '/^version_url/ {print $2}' ${CONFFILE} | awk -F'"' '{print $2}');
+REMOTE_DATA_DIR=$2
+
+SCPCMD="sshpass -i $4 -p $3 scp "
 DLCVE=0;
 DLDAT=0;
 COMMAND=$1;
 CKSUM=0;
+CVEDATADIR="/home/ec2-user/cve/"
+
+
 
 if [ "${COMMAND}" = "pull" ];
 then
 
 for YEAR in $(seq -w 02 `date +%y`);
 do
-  if [ ! -f /home/leo/Music/nvdcve-2.0-20${YEAR}.xml ];
+  if [ ! -f ${CVECACHE}/nvdcve-2.0-20${YEAR}.xml ];
   then
     printf "Downloading nvdcve-2.0-20${YEAR}.xml... ";
     #${WGETCMD} -q -O ${CVECACHE}/nvdcve-2.0-20${YEAR}.xml.gz http://static.nvd.nist.gov/feeds/xml/cve/nvdcve-2.0-20${YEAR}.xml.gz;
     #downloading nvd database through scp with password as argument
-    YEAR="18"
-    ${SCPCMD} $2:/home/leo/cve/nvdcve-2.0-20${YEAR}.xml.gz /home/leo/Music/nvdcve-2.0-20${YEAR}.xml.gz
-    gunzip -c /home/leo/cve/nvdcve-2.0-20${YEAR}.xml.gz > /home/leo/Music/nvdcve-2.0-20${YEAR}.xml #&& rm ${CVECACHE}/nvdcve-2.0-20${YEAR}.xml.gz;
-    exit 1
+    ${SCPCMD} $2:${CVEDATADIR}nvdcve-2.0-20${YEAR}.xml.gz ${CVECACHE}/nvdcve-2.0-20${YEAR}.xml.gz
+    gunzip -c {$CVEDATADIR}nvdcve-2.0-20${YEAR}.xml.gz > ${CVECACHE}/nvdcve-2.0-20${YEAR}.xml && rm ${CVECACHE}/nvdcve-2.0-20${YEAR}.xml.gz;
     printf "ok\nConverting nvdcve-2.0-20${YEAR}.xml to CSV... ";
     xsltproc ${DATADIR}/nvdcve2simple.xsl ${CVECACHE}/nvdcve-2.0-20${YEAR}.xml > ${CVECACHE}/nvdcve-2.0-20${YEAR}.csv;
     printf "ok\nLoading in nvdcve-2.0-20${YEAR}.csv in cvechecker.\n";
     cvechecker -c ${CVECACHE}/nvdcve-2.0-20${YEAR}.csv || die "Could not import nvdcve-2.0-20${YEAR}.csv";
   fi
 done
-exit 1
 
 cd ${CVECACHE};
 if [ ! -f nvdcve-2.0-Modified.xml ];
@@ -101,7 +102,7 @@ else
   CKSUM=$(cksum nvdcve-2.0-Modified.xml 2>/dev/null);
 fi
 printf "Downloading nvdcve-2.0-Modified.xml... ";
-${WGETCMD} -q -N http://static.nvd.nist.gov/feeds/xml/cve/nvdcve-2.0-Modified.xml.gz;
+${SCPCMD} $2:${CVEDATADIR}/nvdcve-2.0-Modified.xml.gz .;
 gunzip -c nvdcve-2.0-Modified.xml.gz > nvdcve-2.0-Modified.xml && rm nvdcve-2.0-Modified.xml.gz;
 CKSUM2=$(cksum nvdcve-2.0-Modified.xml 2>/dev/null);
 if [ "${CKSUM2}" != "${CKSUM}" ] || [ -f nvdcve-2.0-Modified.xml.1 ];
