@@ -45,7 +45,8 @@ then
   exit 1;
 fi
 
-#wget -V > /dev/null 2>&1;
+wget -V > /dev/null 2>&1;
+WGETCMD="wget --no-check-certificate";
 which scp > /dev/null 2>&1; #download internally with scp
 if [ $? -ne 0 ];
 then
@@ -57,7 +58,7 @@ which sshpass > /dev/null 2>&1
 if [ $? -ne 0 ];
 then
   echo "This script requires sshpass to be available on the system and reachable in a directory mentioned in the PATH variable."
-  exit 1;
+#  exit 1;
 fi
 
 
@@ -66,12 +67,12 @@ CVECACHE=$(awk -F'=' '/^cvecache/ {print $2}' ${CONFFILE} | awk -F'"' '{print $2
 DLLOCATION=$(awk -F'=' '/^version_url/ {print $2}' ${CONFFILE} | awk -F'"' '{print $2}');
 REMOTE_DATA_DIR=$2
 
-SCPCMD="sshpass -i $4 -p $3 scp "
+SCPCMD="scp -i $3 "
 DLCVE=0;
 DLDAT=0;
 COMMAND=$1;
 CKSUM=0;
-CVEDATADIR="/home/ec2-user/cve/"
+CVEDATADIR="/home/ec2-user/cve"
 
 
 
@@ -80,20 +81,24 @@ then
 
 for YEAR in $(seq -w 02 `date +%y`);
 do
+
   if [ ! -f ${CVECACHE}/nvdcve-2.0-20${YEAR}.xml ];
   then
+#YEAR=18
     printf "Downloading nvdcve-2.0-20${YEAR}.xml... ";
     #${WGETCMD} -q -O ${CVECACHE}/nvdcve-2.0-20${YEAR}.xml.gz http://static.nvd.nist.gov/feeds/xml/cve/nvdcve-2.0-20${YEAR}.xml.gz;
     #downloading nvd database through scp with password as argument
-    ${SCPCMD} $2:${CVEDATADIR}nvdcve-2.0-20${YEAR}.xml.gz ${CVECACHE}/nvdcve-2.0-20${YEAR}.xml.gz
-    gunzip -c {$CVEDATADIR}nvdcve-2.0-20${YEAR}.xml.gz > ${CVECACHE}/nvdcve-2.0-20${YEAR}.xml && rm ${CVECACHE}/nvdcve-2.0-20${YEAR}.xml.gz;
+    ${SCPCMD} $2:${CVEDATADIR}/nvdcve-2.0-20${YEAR}.xml.gz ${CVECACHE}/nvdcve-2.0-20${YEAR}.xml.gz
+# exit 1  
+	 gunzip -c ${CVECACHE}/nvdcve-2.0-20${YEAR}.xml.gz > ${CVECACHE}/nvdcve-2.0-20${YEAR}.xml && rm ${CVECACHE}/nvdcve-2.0-20${YEAR}.xml.gz;
+#continue #DBS
     printf "ok\nConverting nvdcve-2.0-20${YEAR}.xml to CSV... ";
     xsltproc ${DATADIR}/nvdcve2simple.xsl ${CVECACHE}/nvdcve-2.0-20${YEAR}.xml > ${CVECACHE}/nvdcve-2.0-20${YEAR}.csv;
     printf "ok\nLoading in nvdcve-2.0-20${YEAR}.csv in cvechecker.\n";
     cvechecker -c ${CVECACHE}/nvdcve-2.0-20${YEAR}.csv || die "Could not import nvdcve-2.0-20${YEAR}.csv";
   fi
 done
-
+#exit 1
 cd ${CVECACHE};
 if [ ! -f nvdcve-2.0-Modified.xml ];
 then
